@@ -189,12 +189,92 @@ public:
 
         return Eigen::Vector4d(rect_center(0),rect_center(1),widthheight(0),widthheight(1));
     }
-    
-
-
-
-
 };
+
+class VertexCuboid:public BaseVertex<9,cuboid>{     //this vertex stores object pose to world
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    VertexCuboid(){};
+
+    virtual void setToOriginImpl(){_estimate=cuboid();}
+    virtual void oplusImpl(const double* update_){
+        Eigen::Map<const Vector9d> update(update_); //Eigen::Map接受Ｃ++中普通数组/指针来构造Matrix(Vector)
+        setEstimate(_estimate.exp_update(update));  
+    }
+
+    virtual bool read(std::istream& is){
+        Vector9d est;
+        for(int i=0;i<9;++i)
+            is>>est[i];
+        cuboid Onecube;
+        Onecube.fromMinimalVector(est);
+        setEstimate(Onecube);
+        return true;
+    }
+
+    virtual bool write(std::ostream& os) const{
+        Vector9d lv=_estimate.toMinimalVector();
+        for(int i=0;i<lv.rows();++i){
+            os<<lv[i]<<" ";
+        }
+        return os.good();
+    }
+};
+
+// camera-object 3Derror
+class EdgeSE3Cuboid:public BaseBinaryEdge<9,cuboid,VertexSE3Expmap,VertexCuboid>{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    EdgeSE3Cuboid(){}
+
+    virtual bool read(std::istream& is){
+        return true;
+    }
+
+    virtual bool write(std::ostream& os){
+        return os.good();
+    }
+
+    void computeError(){
+        const VertexSE3Expmap* SE3Vertex=static_cast<const VertexSE3Expmap*>(_vertices[0]); //world to camera pose
+        const VertexCuboid* cuboidVertex=static_cast<const VertexCuboid*>(_vertices[1]);    //object pose to world
+
+        SE3Quat cam_pose_Twc=SE3Vertex->estimate().inverse();
+        cuboid global_cube=cuboidVertex->estimate();
+        cuboid esti_global_cube=_measurement.transform_from(cam_pose_Twc);
+        _error=global_cube.min_log_error(esti_global_cube);
+    }
+};
+
+// camera-object 2D projection error, rectangle difference, could also change to IOU
+class EdgeSE3CuboidProj:public BaseBinaryEdge<4,Eigen::Vector4d,VertexSE3Expmap,VertexCuboid>{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    EdgeSE3CuboidProj(){}
+
+    virtual bool read(std::istream& is){
+        return true;
+    }
+
+    virtual bool write(std::ostream& os){
+        return os.good();
+    }
+
+    void computeError(){
+        const VertexSE3Expmap* SE3Vertex=static_cast<const VertexSE3Expmap*>(_vertices[0]); //world to camera pose
+        const VertexCuboid* cuboidVertex=static_cast<const VertexCuboid*>(_vertices[1]);    //object pose to world
+
+        SE3Quat cam_pose_Tcw=SE3Vertex->estimate();
+        cuboid global_cube=cuboidVertex->estimate();
+
+        Eigen::Vector4d rect_project=global_cube.projectOntoImageBbox(cam_pose_Tcw,Kalib); //center, width, height
+
+        _error = rect_project-_measurement; 
+    }
+
+    Eigen::Matrix3d Kalib;
+};
+
 
 }
 
