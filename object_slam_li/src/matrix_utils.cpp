@@ -94,3 +94,37 @@ void homo_to_real_coord(const Eigen::Matrix<T, Eigen::Dynamic,Eigen::Dynamic>& p
 }
 template void homo_to_real_coord<double>(const Eigen::MatrixXd&, Eigen::MatrixXd&);
 template void homo_to_real_coord<float>(const Eigen::MatrixXf&, Eigen::MatrixXf&);
+
+template<class T>
+bool read_all_number_txt(const std::string txt_file_name, Eigen::Matrix<T,Eigen::Dynamic, Eigen::Dynamic>& read_number_mat){
+    if(!std::ifstream(txt_file_name)){
+        std::cout<<"Error!!! Cannot read txt file "<<txt_file_name<<std::endl;
+        return false;
+    }
+    std:ifstream filetxt(txt_file_name.c_str());
+    int row_counter=0;
+    std::string line;
+    if(read_number_mat.rows()==0)
+        read_number_mat.resize(100,10);
+    
+    while(getline(filetxt,line)){
+        T t;
+        if(!line.empty()){
+            std::stringstream ss(line);
+            int colu=0;
+            while(ss>>t){
+                read_number_mat(row_counter,colu)=t;
+                colu++;
+            }
+            row_counter++;
+            if(row_counter>=read_number_mat.rows()) //if matrix row is not enough, make more space.
+                read_number_mat.conservativeResize(read_number_mat.rows()*2,read_number_mat.cols());
+        }
+    }
+    filetxt.close();
+
+    read_number_mat.conservativeResize(row_counter,read_number_mat.cols());     //cut into actual rows
+
+    return true;
+}
+template bool read_all_number_txt(const std::string, MatrixXd&);template bool read_all_number_txt(const std::string, MatrixXi&);
