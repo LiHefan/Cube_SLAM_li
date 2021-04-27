@@ -17,7 +17,7 @@ public:
     g2o::VertexSE3Expmap* pose_vertex;
 
     //从这一帧中生成的立方体，可能不是SLAM的路标
-    std::vector<object_landmark*> observed_cuboids; //generated cuboid from this frame, maynot be actual SLAM landmark
+    std::vector<shared_ptr<object_landmark>> observed_cuboids; //generated cuboid from this frame, maynot be actual SLAM landmark
 
     //优化后的位姿
     g2o::SE3Quat cam_pose_Tcw;  //optimized pose world to cam
