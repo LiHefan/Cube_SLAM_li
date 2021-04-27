@@ -105,7 +105,7 @@ bool read_all_number_txt(const std::string txt_file_name, Eigen::Matrix<T,Eigen:
     int row_counter=0;
     std::string line;
     if(read_number_mat.rows()==0)
-        read_number_mat.resize(100,10);
+        read_number_mat.resize(100,10); 
     
     while(getline(filetxt,line)){
         T t;
