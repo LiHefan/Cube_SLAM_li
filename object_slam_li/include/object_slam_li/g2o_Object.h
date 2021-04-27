@@ -231,7 +231,7 @@ public:
         return true;
     }
 
-    virtual bool write(std::ostream& os){
+    virtual bool write(std::ostream& os) const{
         return os.good();
     }
 
@@ -256,7 +256,7 @@ public:
         return true;
     }
 
-    virtual bool write(std::ostream& os){
+    virtual bool write(std::ostream& os) const{
         return os.good();
     }
 
