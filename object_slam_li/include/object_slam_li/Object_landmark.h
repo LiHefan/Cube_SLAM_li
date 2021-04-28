@@ -1,7 +1,7 @@
 #pragma once
 
 #include<vector>
-#include"g2o_Object.h"
+#include"object_slam_li/g2o_Object.h"
 
 //object_landmark类
 //包含cuboid的信息

@@ -2,7 +2,7 @@
 
 #include<g2o/core/base_multi_edge.h>
 #include<g2o/types/sba/types_six_dof_expmap.h>
-#include "matrix_utils.h"
+#include "object_slam_li/matrix_utils.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>

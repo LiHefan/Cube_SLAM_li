@@ -1,4 +1,4 @@
-#include"matrix_utils.h"
+#include"object_slam_li/matrix_utils.h"
 
 #include<math.h>
 #include<stdio.h>
@@ -35,8 +35,8 @@ template <class T>
 void quat_to_euler_zyx(const Eigen::Quaternion<T>& q, T& roll, T& pitch, T& yaw){
     T qw=q.w();
     T qx=q.x();
-    T qw=q.y();
-    T qx=q.z();
+    T qy=q.y();
+    T qz=q.z();
 
     roll = atan2(2*(qw*qx+qy*qz), 1-2*(qx*qx+qy*qy));
     pitch = asin(2*(qw*qy-qz*qx));
@@ -101,7 +101,7 @@ bool read_all_number_txt(const std::string txt_file_name, Eigen::Matrix<T,Eigen:
         std::cout<<"Error!!! Cannot read txt file "<<txt_file_name<<std::endl;
         return false;
     }
-    std:ifstream filetxt(txt_file_name.c_str());
+    std::ifstream filetxt(txt_file_name.c_str());
     int row_counter=0;
     std::string line;
     if(read_number_mat.rows()==0)

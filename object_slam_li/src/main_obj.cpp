@@ -8,9 +8,9 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
-#include <pcl_ros/point_cloud.h>
-#include <pcl/PCLPointCloud2.h>
-#include <pcl/filters/approximate_voxel_grid.h>
+// #include <pcl_ros/point_cloud.h>
+// #include <pcl/PCLPointCloud2.h>
+// #include <pcl/filters/approximate_voxel_grid.h>
 
 #include <g2o/core/block_solver.h>
 #include <g2o/core/optimization_algorithm_levenberg.h>
@@ -18,51 +18,25 @@
 #include <g2o/types/sba/types_six_dof_expmap.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
 
-#include "Object_landmark.h"
-#include "Frame.h"
-#include "g2o_Object.h"
-#include "matrix_utils.h"
+#include "object_slam_li/Object_landmark.h"
+#include "object_slam_li/Frame.h"
+#include "object_slam_li/g2o_Object.h"
+#include "object_slam_li/matrix_utils.h"
 
 using namespace std;
 using namespace Eigen;
 
-typedef pcl::PointCloud<pcl::PointXYZRGB> CloudXYZRGB;
+//typedef pcl::PointCloud<pcl::PointXYZRGB> CloudXYZRGB;
 
 //global variable
 string base_folder="/home/li/Cube_SLAM_li/object_slam_li/data/";
 cv::Mat_<float> matx_to3d_, maty_to3d_;
 
-
-
-
-int main(int argc,char* argv[]){
-    //初始化信息
-    cout<<"base_folder "<<base_folder<<endl;
-
-//STEP【１】: 读取参数（离线模式,使用.txt）
-    std::string pred_objs_txt=base_folder+"detect_cuboids_saved.txt";       //ground frame中的立方体位姿 //saved cuboids in local ground frame
-    std::string init_camera_pose=base_folder+"pop_camera_poses_saved.txt";  //offline camera pose for cuboids detection(x y yaw=0, truth roll/pitch/height)
-    std::string truth_camera_pose=base_folder+"truth_cam_poses.txt";        //相机真实的位姿
-
-    Eigen::MatrixXd pred_frame_objects(100,10);
-    Eigen::MatrixXd init_frame_poses(100,8);
-    Eigen::MatrixXd truth_frame_poses(100,8);
-
-    if(!read_all_number_txt(pred_objs_txt,pred_frame_objects))
-        return -1;
-
-    if(!read_all_number_txt(init_camera_pose,init_frame_poses))
-        return -1;
-    
-    if(!read_all_number_txt(truth_camera_pose,truth_frame_poses))
-        return -1;
-
-
-    std::cout<<"read data size: "<<pred_frame_objects.rows()<<" "<<init_frame_poses.rows()<<" "<<truth_frame_poses.rows()<<std::endl;
-  //STEP【２】: 传入参数开始增量式图优化
-    incremental_build_graph(pred_frame_objects,init_frame_poses,truth_frame_poses);
-
+void save_all_poses(vector<shared_ptr<tracking_frame>> all_frames,vector<shared_ptr<object_landmark>> cube_landmarks_history,
+               vector<shared_ptr<object_landmark>> all_frame_rawcubes, Eigen::MatrixXd& truth_frame_poses){
+//TODO
 }
+
 
 void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen::MatrixXd& init_frame_poses, Eigen::MatrixXd& truth_frame_poses){
     //STEP【１】变量定义
@@ -112,7 +86,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             if(frame_index>1){      // frome third frame, use the constant motion model to initialize camera　//second frame=first???
                 g2o::SE3Quat prev_prev_pose_Tcw=all_frames[frame_index-2]->cam_pose_Tcw;
                 //从上一帧到本帧的变换
-                odom_val=prev_pose_Tcw*prev_prev_pose_Tcw.inverse();  //why not use prev_prev_pose_Twc???
+                odom_val=prev_pose_Tcw*prev_prev_pose_Tcw.inverse(); 
             }
             //计算当前帧位姿
             curr_cam_pose_Twc=(odom_val*prev_pose_Tcw).inverse();
@@ -222,13 +196,75 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             graph.addEdge(e);
         }
 
-    }
+        //do optimization!
+        graph.initializeOptimization();
+        graph.optimize(5);
 
+        //retrieve the optimization result, for debug visualization
+        for(int j=0;j<=frame_index;++j){
+            all_frames[j]->cam_pose_Tcw=all_frames[j]->pose_vertex->estimate();
+            all_frames[j]->cam_pose_Twc=all_frames[j]->cam_pose_Tcw.inverse();
+        }
+        //vCube->estimate()--cube_pos_opti_history
+        shared_ptr<object_landmark> current_landmark=make_shared<object_landmark>(object_landmark());
+        current_landmark->cube_vertex=new g2o::VertexCuboid();
+        current_landmark->cube_vertex->setEstimate(vCube->estimate()); //why not use cube_vertex=vCube???
+        cube_pose_opti_history[frame_index]=current_landmark;
+
+        //global_cube--cube_pose_raw_detected_hitory
+        if(all_frames[frame_index]->observed_cuboids.size()>0){
+            shared_ptr<object_landmark> cube_landmark_meas=all_frames[frame_index]->observed_cuboids[0];
+            g2o::cuboid local_cube=cube_landmark_meas->cube_meas;
+            g2o::cuboid global_cube=local_cube.transform_from(all_frames[frame_index]->cam_pose_Twc);
+
+            shared_ptr<object_landmark> tempcuboids2=make_shared<object_landmark>(object_landmark());
+            tempcuboids2->cube_vertex=new g2o::VertexCuboid();
+            tempcuboids2->cube_vertex->setEstimate(global_cube);
+            cube_pose_raw_detected_history[frame_index]=tempcuboids2;
+        }
+        else
+            cube_pose_raw_detected_history[frame_index]=nullptr;
+        
+    }
+    //STEP 6 output/visualization
+    cout<<"**************Finish all optimiztion! Begin saving.*****************"<<endl;
     
 
+}
 
+
+int main(int argc,char* argv[]){
+    //初始化信息
+    cout<<"base_folder "<<base_folder<<endl;
+
+//STEP【１】: 读取参数（离线模式,使用.txt）
+    std::string pred_objs_txt=base_folder+"detect_cuboids_saved.txt";       //ground frame中的立方体位姿 //saved cuboids in local ground frame
+    std::string init_camera_pose=base_folder+"pop_cam_poses_saved.txt";  //offline camera pose for cuboids detection(x y yaw=0, truth roll/pitch/height)
+    std::string truth_camera_pose=base_folder+"truth_cam_poses.txt";        //相机真实的位姿
+
+    Eigen::MatrixXd pred_frame_objects(100,10);
+    Eigen::MatrixXd init_frame_poses(100,8);
+    Eigen::MatrixXd truth_frame_poses(100,8);
+
+    if(!read_all_number_txt(pred_objs_txt,pred_frame_objects))
+        return -1;
+
+    if(!read_all_number_txt(init_camera_pose,init_frame_poses))
+        return -1;
+    
+    if(!read_all_number_txt(truth_camera_pose,truth_frame_poses))
+        return -1;
+
+
+    std::cout<<"read data size: "<<pred_frame_objects.rows()<<" "<<init_frame_poses.rows()<<" "<<truth_frame_poses.rows()<<std::endl;
+  //STEP【２】: 传入参数开始增量式图优化
+    incremental_build_graph(pred_frame_objects,init_frame_poses,truth_frame_poses);
+
+    cout<<"all finished"<<endl;
 
 }
+
+
 
 
 

@@ -2,7 +2,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include "g2o_Object.h"
+#include "object_slam_li/g2o_Object.h"
 
 class object_landmark;
 
@@ -15,12 +15,7 @@ public:
     
     //g2o优化的顶点
     g2o::VertexSE3Expmap* pose_vertex;
-
-    //从这一帧中生成的立方体，可能不是SLAM的路标
-    std::vector<shared_ptr<object_landmark>> observed_cuboids; //generated cuboid from this frame, maynot be actual SLAM landmark
-
-    //优化后的位姿
+    std::vector<std::shared_ptr<object_landmark>> observed_cuboids; //generated cuboid from this frame, maynot be actual SLAM landmark
     g2o::SE3Quat cam_pose_Tcw;  //optimized pose world to cam
     g2o::SE3Quat cam_pose_Twc;  //optimized pose cam to world
-
-}；
+};
