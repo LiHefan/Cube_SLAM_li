@@ -33,14 +33,14 @@ template Eigen::Quaternionf zyx_euler_to_quat<float>(const float&, const float&,
 
 template <class T>
 void quat_to_euler_zyx(const Eigen::Quaternion<T>& q, T& roll, T& pitch, T& yaw){
-    T qw=q.w();
-    T qx=q.x();
-    T qy=q.y();
-    T qz=q.z();
+    const T qw=q.w();
+    const T qx=q.x();
+    const T qy=q.y();
+    const T qz=q.z();
 
     roll = atan2(2*(qw*qx+qy*qz), 1-2*(qx*qx+qy*qy));
-    pitch = asin(2*(qw*qy-qz*qx));
-    yaw = atan2(2*(qw*qz+qx*qy), 1-2*(qy*qy+qz*qz));
+	pitch = asin(2*(qw*qy-qz*qx));
+	yaw = atan2(2*(qw*qz+qx*qy), 1-2*(qy*qy+qz*qz));
 }
 template void quat_to_euler_zyx<double>(const Eigen::Quaterniond&, double&, double&, double&);
 template void quat_to_euler_zyx<float>(const Eigen::Quaternionf&, float&, float&, float&);

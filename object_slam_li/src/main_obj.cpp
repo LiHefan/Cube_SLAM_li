@@ -53,7 +53,7 @@ void save_all_poses(vector<shared_ptr<tracking_frame>> all_frames,vector<shared_
     objresultsFile.open(objresultsPath.c_str());
     for(size_t j=0;j<cube_landmarks_history.size();++j){
         g2o::cuboid cube_opti=cube_landmarks_history[j]->cube_vertex->estimate();
-        objresultsFile<<cube_opti.toVector().transpose()<<" "<<"\n";
+        objresultsFile<<cube_opti.toMinimalVector().transpose()<<" "<<"\n";
     }
     objresultsFile.close();
     cout<<"***************** Data saved *****************"<<endl;

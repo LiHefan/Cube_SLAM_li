@@ -133,6 +133,7 @@ public:
         v[4]=pitch;
         v[5]=yaw;
         v.tail<3>()=scale;
+        return v;
 
     }
         //xyz quaternion lwh(half)
