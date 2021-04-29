@@ -61,6 +61,7 @@ public:
         Vector9d res;
         SE3Quat pose_diff=newone.pose.inverse()*this->pose;
         res.head<6>()=pose_diff.log();
+        res.tail<3>()=this->scale-newone.scale;
         return res;
     }
 
@@ -75,7 +76,7 @@ public:
         Eigen::Vector4d rotate_angles(-1,0,1,2); //rotate -90 0 90 180
         Eigen::Matrix<double,9,4> rotate_errors;
         for(int i=0;i<rotate_errors_norm.rows();++i){
-            cuboid rotated_cuboid =newone.rotate_cuboid(rotate_angles[i]*M_PI/2.0); //rotate new cuboids
+            cuboid rotated_cuboid =newone.rotate_cuboid(rotate_angles(i)*M_PI/2.0); //rotate new cuboids
             Vector9d cuboid_error=this->cube_log_error(rotated_cuboid);
             rotate_errors_norm(i)=cuboid_error.norm();
             rotate_errors.col(i)=cuboid_error;

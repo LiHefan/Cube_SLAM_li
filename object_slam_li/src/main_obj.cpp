@@ -34,7 +34,29 @@ cv::Mat_<float> matx_to3d_, maty_to3d_;
 
 void save_all_poses(vector<shared_ptr<tracking_frame>> all_frames,vector<shared_ptr<object_landmark>> cube_landmarks_history,
                vector<shared_ptr<object_landmark>> all_frame_rawcubes, Eigen::MatrixXd& truth_frame_poses){
-//TODO
+
+    int total_frame_number=all_frames.size();
+    ofstream resultsFile;
+    string resultsPath=base_folder+"output_cam_poses.txt";
+    cout<<"resultsPath: "<<resultsPath<<endl;
+    resultsFile.open(resultsPath.c_str());
+    resultsFile<<"# timestamp tx ty tz qx qy qz qw"<<"\n";    
+    for(int i=0;i<total_frame_number;++i){
+        string time_string=to_string(truth_frame_poses(i,0));
+        resultsFile<<time_string<<" ";
+        resultsFile<<all_frames[i]->cam_pose_Twc.toVector().transpose()<<"\n";
+    }
+    resultsFile.close();
+
+    ofstream objresultsFile;
+    string objresultsPath=base_folder+"output_obj_poses.txt";
+    objresultsFile.open(objresultsPath.c_str());
+    for(size_t j=0;j<cube_landmarks_history.size();++j){
+        g2o::cuboid cube_opti=cube_landmarks_history[j]->cube_vertex->estimate();
+        objresultsFile<<cube_opti.toVector().transpose()<<" "<<"\n";
+    }
+    objresultsFile.close();
+    cout<<"***************** Data saved *****************"<<endl;
 }
 
 
@@ -60,8 +82,8 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
     graph.setVerbose(false);
 
     // only first truth pose is used, to diretly visually compare with truth pose, also provide good roll/pitch
-    //构造一个四元数形式的fix_init_cam_pose_Twc读取第一帧位姿
-    g2o::SE3Quat fix_init_cam_pose_Twc(truth_frame_poses.row(0).tail<7>());
+    //构造一个四元数形式的fixed_init_cam_pose_Twc读取第一帧位姿
+    g2o::SE3Quat fixed_init_cam_pose_Twc(truth_frame_poses.row(0).tail<7>());
 
     //保存每帧的优化结果
     std::vector<shared_ptr<object_landmark>> cube_pose_opti_history(total_frame_number,nullptr); //lankmark pose after each frame's optimization
@@ -73,6 +95,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
     std::vector<shared_ptr<tracking_frame>> all_frames(total_frame_number);
     g2o::VertexCuboid* vCube;
 
+    cout<<"**************Start processing*******************"<<endl;
     //处理每一帧图像
     for(int frame_index=0;frame_index<total_frame_number;++frame_index){
         g2o::SE3Quat curr_cam_pose_Twc;     //当前帧的位姿
@@ -80,10 +103,10 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
 
         //STEP１：计算每一帧位姿
         if(frame_index==0)
-            curr_cam_pose_Twc=fix_init_cam_pose_Twc;
+            curr_cam_pose_Twc=fixed_init_cam_pose_Twc;
         else{
             g2o::SE3Quat prev_pose_Tcw=all_frames[frame_index-1]->cam_pose_Tcw;
-            if(frame_index>1){      // frome third frame, use the constant motion model to initialize camera　//second frame=first???
+            if(frame_index>1){      // from third frame, use the constant motion model to initialize camera　//second frame=first???
                 g2o::SE3Quat prev_prev_pose_Tcw=all_frames[frame_index-2]->cam_pose_Tcw;
                 //从上一帧到本帧的变换
                 odom_val=prev_pose_Tcw*prev_prev_pose_Tcw.inverse(); 
@@ -94,7 +117,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
         }
 
         //STEP２：信息存储
-        shared_ptr<tracking_frame> currframe=make_shared<tracking_frame>(tracking_frame());
+        shared_ptr<tracking_frame> currframe=make_shared<tracking_frame>();
         currframe->frame_seq_id=frame_index;
         all_frames[frame_index]=currframe;
 
@@ -136,7 +159,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
 
         //STEP４:立方体路标
         if(has_detected_cuboid){
-            shared_ptr<object_landmark> localcuboid=make_shared<object_landmark>(object_landmark());
+            shared_ptr<object_landmark> localcuboid=make_shared<object_landmark>();
             localcuboid->cube_meas=cube_local_meas;
             localcuboid->meas_quality=(1-proposal_error+0.5)/2; //higher,better
             currframe->observed_cuboids.push_back(localcuboid);
@@ -206,9 +229,9 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             all_frames[j]->cam_pose_Twc=all_frames[j]->cam_pose_Tcw.inverse();
         }
         //vCube->estimate()--cube_pos_opti_history
-        shared_ptr<object_landmark> current_landmark=make_shared<object_landmark>(object_landmark());
+        shared_ptr<object_landmark> current_landmark=make_shared<object_landmark>();
         current_landmark->cube_vertex=new g2o::VertexCuboid();
-        current_landmark->cube_vertex->setEstimate(vCube->estimate()); //why not use cube_vertex=vCube???
+        current_landmark->cube_vertex->setEstimate(vCube->estimate()); 
         cube_pose_opti_history[frame_index]=current_landmark;
 
         //global_cube--cube_pose_raw_detected_hitory
@@ -217,7 +240,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             g2o::cuboid local_cube=cube_landmark_meas->cube_meas;
             g2o::cuboid global_cube=local_cube.transform_from(all_frames[frame_index]->cam_pose_Twc);
 
-            shared_ptr<object_landmark> tempcuboids2=make_shared<object_landmark>(object_landmark());
+            shared_ptr<object_landmark> tempcuboids2=make_shared<object_landmark>();
             tempcuboids2->cube_vertex=new g2o::VertexCuboid();
             tempcuboids2->cube_vertex->setEstimate(global_cube);
             cube_pose_raw_detected_history[frame_index]=tempcuboids2;
@@ -228,7 +251,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
     }
     //STEP 6 output/visualization
     cout<<"**************Finish all optimiztion! Begin saving.*****************"<<endl;
-    
+    save_all_poses(all_frames,cube_pose_opti_history,cube_pose_raw_detected_history,truth_frame_poses);
 
 }
 
@@ -260,7 +283,7 @@ int main(int argc,char* argv[]){
   //STEP【２】: 传入参数开始增量式图优化
     incremental_build_graph(pred_frame_objects,init_frame_poses,truth_frame_poses);
 
-    cout<<"all finished"<<endl;
+    cout<<"************************All finished*********************"<<endl;
 
 }
 
