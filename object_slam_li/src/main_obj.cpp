@@ -68,7 +68,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             0,539.2,247.6,
             0,0,1;
     //帧数，即truth_frame_poses中的列数
-    int total_frame_number=truth_frame_poses.rows();
+    int total_frame_number=2;//=truth_frame_poses.rows();
 
     //STEP 【２】:graph optimization
     //in this example, there is only one object
@@ -113,8 +113,9 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             }
             //计算当前帧位姿
             curr_cam_pose_Twc=(odom_val*prev_pose_Tcw).inverse();
-
         }
+
+        cout<<"No."<<frame_index<<" frame initialized Twc: "<<curr_cam_pose_Twc.toMinimalVector()<<endl;  //debug
 
         //STEP２：信息存储
         shared_ptr<tracking_frame> currframe=make_shared<tracking_frame>();
@@ -146,6 +147,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             Eigen::VectorXd cam_pose_vec=init_frame_poses.row(frame_index);
             g2o::SE3Quat cam_val_Twc(cam_pose_vec.segment<7>(1));   //time x y z qx qy qz qw
             cube_local_meas=cube_ground_value.transform_to(cam_val_Twc); //measurement in local camera frame
+            cout<<"No."<<frame_index<<" initialized cube pose: "<<cube_local_meas.toMinimalVector()<<endl; //debug
 
             //立方体提案的误差
             proposal_error=measure_data(8);
@@ -198,6 +200,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             inv_sigma<<1,1,1,1,1,1,1,1,1;
             inv_sigma=inv_sigma*2.0*cube_landmark_meas->meas_quality;
             Matrix9d info=inv_sigma.cwiseProduct(inv_sigma).asDiagonal();
+            cout<<"No."<<frame_index<<"cam-obj edge info matrix:"<<endl<<info<<endl; //debug
             e->setInformation(info);
             graph.addEdge(e);
 
@@ -215,6 +218,7 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
             inv_sigma<<1,1,1,1,1,1;
             inv_sigma=inv_sigma*1.0;
             Matrix6d info=inv_sigma.cwiseProduct(inv_sigma).asDiagonal();
+            cout<<"No."<<frame_index<<"cam-cam edge info matrix:"<<endl<<info<<endl; //debug
             e->setInformation(info);
             graph.addEdge(e);
         }
@@ -222,6 +226,12 @@ void incremental_build_graph(Eigen::MatrixXd& offline_pred_frame_objects, Eigen:
         //do optimization!
         graph.initializeOptimization();
         graph.optimize(5);
+
+        for(int i=0;i<=frame_index;++i){
+            cout<<"No."<<i<<"cam_pose after "<<frame_index+1<<" optimization: "
+                <<all_frames[i]->pose_vertex->estimate().inverse().toMinimalVector()<<endl;
+        }
+        cout<<"cube_pose after "<<frame_index+1<<" optimization: "<<vCube->estimate().toMinimalVector()<<endl; //debug
 
         //retrieve the optimization result, for debug visualization
         for(int j=0;j<=frame_index;++j){
